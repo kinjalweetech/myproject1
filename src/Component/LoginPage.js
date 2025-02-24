@@ -1,215 +1,134 @@
 import React, { useState } from 'react'
-import { IoMdPerson } from "react-icons/io";
-import { IoIosMail } from "react-icons/io";
-import { RiLockPasswordFill } from "react-icons/ri";
-import { FaFacebook } from "react-icons/fa6";
-import { FaTwitter } from "react-icons/fa";
-import { FaOpera } from "react-icons/fa6";
-import { userLogin } from './Service/LoginService';
-import axios from 'axios';
+import { useNavigate, useLocation } from 'react-router-dom'
+import { useDispatch } from 'react-redux'
+import { setUser } from './redux/AuthSlice'
+import { userLogin } from './Service/LoginService'
 
 function LoginPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const dispatch = useDispatch();
   const [formData, setFormData] = useState({
-    username: '',
-    password: '',
     email: '',
+    password: ''
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [apiError, setApiError] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prevState => ({
-      ...prevState,
+    setFormData(prev => ({
+      ...prev,
       [name]: value
     }));
-    // Clear errors when user starts typing
     if (errors[name]) {
-      setErrors(prevErrors => ({
-        ...prevErrors,
+      setErrors(prev => ({
+        ...prev,
         [name]: ''
       }));
     }
-    setApiError(''); // Clear API error when user makes changes
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-    if (!formData.username.trim()) {
-      newErrors.username = 'Username is required';
-    }
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email';
-    }
-    if (!formData.password.trim()) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
-    return newErrors;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const newErrors = validateForm();
+    const newErrors = {};
+    if (!formData.email) newErrors.email = 'Email is required';
+    if (!formData.password) newErrors.password = 'Password is required';
 
-    if (Object.keys(newErrors).length === 0) {
-      setIsLoading(true);
-      setApiError('');
-      
-      try {
-        const response = await userLogin({
-          body: {
-            username: formData.username,
-            email: formData.email,
-            password: formData.password
-          }
-        });
-
-        // Handle successful login
-        console.log('Login successful:', response);
-        // Reset form
-        setFormData({ username: '', email: '', password: '' });
-        
-        // Here you might want to:
-        // - Store the token in localStorage
-        // localStorage.setItem('token', response.token);
-        // - Redirect to dashboard
-        // - Update global auth state
-        
-      } catch (error) {
-        console.error('Login error:', error);
-        setApiError(
-          error.response?.data?.message || 
-          'An error occurred during login. Please try again.'
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    } else {
+    if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await userLogin(formData);
+      dispatch(setUser({ email: formData.email }));
+      const from = location.state?.from?.pathname || '/home';
+      navigate(from);
+    } catch (error) {
+      setErrors({ submit: 'Login failed. Please try again.' });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleSocialLogin = (platform) => {
-    console.log(`Logging in with ${platform}`);
-    // Implement social login logic here
-  };
-
   return (
-    <div className='h-screen w-full flex justify-center items-center bg-gradient-to-r from-purple-500 to-pink-500'>
-      <div className='bg-white w-[400px] flex flex-col items-center rounded-3xl shadow-lg p-8'>
-        <h1 className='font-bold text-3xl text-gray-800 mb-8'>Login</h1>
-        
-        {apiError && (
-          <div className="w-full mb-4 p-3 bg-red-100 text-red-700 rounded-lg">
-            {apiError}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className='flex flex-col w-full gap-4'>
-          <div className='flex flex-col gap-2'>
-            <label className='text-gray-600 flex justify-start font-bold'>Username</label>
-            <div className='relative'>
-              <span className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400'>
-                <IoMdPerson />
-              </span>
-              <input
-                type="text"
-                name="username"
-                value={formData.username}
-                onChange={handleChange}
-                placeholder='Type your username'
-                className={`w-full bg-gray-100 rounded-lg py-2 px-10 focus:outline-none ${errors.username ? 'border-red-500 border' : ''}`}
-                disabled={isLoading}
-              />
+    <div className='min-h-screen bg-gradient-to-br from-green-50 to-purple-50'>
+      <div className='container mx-auto px-4 py-16'>
+        <div className='max-w-md mx-auto bg-white rounded-xl shadow-lg p-8'>
+          <h2 className='text-3xl font-bold text-center mb-8'>Welcome Back</h2>
+          
+          {errors.submit && (
+            <div className='mb-4 p-3 bg-red-100 text-red-700 rounded-lg'>
+              {errors.submit}
             </div>
-            {errors.username && <span className="text-red-500 text-sm">{errors.username}</span>}
-          </div>
+          )}
 
-          <div className='flex flex-col gap-2'>
-            <label className='text-gray-600 flex justify-start font-bold'>Email</label>
-            <div className='relative'>
-              <span className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400'>
-                <IoIosMail />
-              </span>
+          <form onSubmit={handleSubmit} className='space-y-6'>
+            <div>
+              <label className='block text-gray-700 font-medium mb-2'>
+                Email
+              </label>
               <input
-                type="email"
-                name="email"
+                type='email'
+                name='email'
                 value={formData.email}
                 onChange={handleChange}
-                placeholder='Type your email'
-                className={`w-full bg-gray-100 rounded-lg py-2 px-10 focus:outline-none ${errors.email ? 'border-red-500 border' : ''}`}
+                className={`w-full px-4 py-3 rounded-lg bg-gray-50 border ${
+                  errors.email ? 'border-red-500' : 'border-gray-200'
+                } focus:outline-none focus:border-black`}
+                placeholder='Enter your email'
                 disabled={isLoading}
               />
+              {errors.email && (
+                <p className='mt-1 text-red-500 text-sm'>{errors.email}</p>
+              )}
             </div>
-            {errors.email && <span className="text-red-500 text-sm">{errors.email}</span>}
-          </div>
 
-          <div className='flex flex-col gap-2'>
-            <label className='text-gray-600 flex justify-start font-bold'>Password</label>
-            <div className='relative'>
-              <span className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400'>
-                <RiLockPasswordFill />
-              </span>
+            <div>
+              <label className='block text-gray-700 font-medium mb-2'>
+                Password
+              </label>
               <input
-                type="password"
-                name="password"
+                type='password'
+                name='password'
                 value={formData.password}
                 onChange={handleChange}
-                placeholder='Type your password'
-                className={`w-full bg-gray-100 rounded-lg py-2 px-10 focus:outline-none ${errors.password ? 'border-red-500 border' : ''}`}
+                className={`w-full px-4 py-3 rounded-lg bg-gray-50 border ${
+                  errors.password ? 'border-red-500' : 'border-gray-200'
+                } focus:outline-none focus:border-black`}
+                placeholder='Enter your password'
                 disabled={isLoading}
               />
+              {errors.password && (
+                <p className='mt-1 text-red-500 text-sm'>{errors.password}</p>
+              )}
             </div>
-            {errors.password && <span className="text-red-500 text-sm">{errors.password}</span>}
-            <div className='flex justify-end'>
-              <a href="#" className='text-sm text-gray-500 hover:text-gray-700'>Forgot password?</a>
-            </div>
-          </div>
 
-          <button
-            type="submit"
-            className={`w-full py-2 mt-4 rounded-full bg-gradient-to-r from-cyan-400 to-pink-500 text-white font-semibold 
-              ${isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:opacity-90'} transition-opacity`}
-            disabled={isLoading}
-          >
-            {isLoading ? 'Logging in...' : 'LOGIN'}
-          </button>
+            <button
+              type='submit'
+              disabled={isLoading}
+              className={`w-full py-3 bg-black text-white rounded-lg font-medium
+                ${isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-gray-800'} 
+                transition-colors`}
+            >
+              {isLoading ? 'Signing in...' : 'Sign in'}
+            </button>
+          </form>
 
-          <div className='text-center mt-4'>
-            <p className='text-gray-600 mb-4'>Or Sign Up Using</p>
-            <div className='flex justify-center gap-4'>
+          <div className='mt-6 text-center'>
+            <p className='text-gray-600'>
+              Don't have an account?{' '}
               <button
-                type="button"
-                onClick={() => handleSocialLogin('facebook')}
-                className='w-10 h-10 rounded-full bg-[#3b5998] text-white flex items-center justify-center hover:opacity-90 transition-opacity'
-                disabled={isLoading}
+                onClick={() => navigate('/signup')}
+                className='text-black font-medium hover:underline'
               >
-                <FaFacebook />
+                Sign up
               </button>
-              <button
-                type="button"
-                onClick={() => handleSocialLogin('twitter')}
-                className='w-10 h-10 rounded-full bg-[#1DA1F2] text-white flex items-center justify-center hover:opacity-90 transition-opacity'
-                disabled={isLoading}
-              >
-                <FaTwitter />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSocialLogin('opera')}
-                className='w-10 h-10 rounded-full bg-[#DB4437] text-white flex items-center justify-center hover:opacity-90 transition-opacity'
-                disabled={isLoading}
-              >
-                <FaOpera />
-              </button>
-            </div>
+            </p>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   )
